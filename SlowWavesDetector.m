@@ -13,6 +13,9 @@ classdef SlowWavesDetector < handle
         percentileForAmplitude = 40; %the percentile to leave (i.e. if it's set to 40 we set the threshold such that 40% of the waves will pass it)
         percentileForAmplitudeStaresina = 25;
         
+        desiredPercentOfSlowWaves = 20; % This is a lower amplitude percentile for SHAM analyis
+        
+        
         minLengthThresh = 0.8; %seconds
         maxLengthThresh = 2; %seconds
         
@@ -171,9 +174,9 @@ classdef SlowWavesDetector < handle
             %maximal amplitude and duration, as described in Staresina et
             %al 2015
             %Input - 
-            %data - in which we want to detect slow waves
-            %Output -
-            %slowWavesTimes - slow waves times corresponding to peak time
+            % data - in which we want to detect slow waves
+            % Output -
+            % slowWavesTimes - slow waves times corresponding to peak time
             % Slow wave candidates are between zero crossings of the
             % filtered data, only candidates with the highest 25% amplitude
             % (peak-trough) and within duration limits are kept
@@ -266,20 +269,7 @@ classdef SlowWavesDetector < handle
                 ampCycles(iCycle) = peakVal-troughVal;
                 
                 peakInds(iCycle) = peakInds(iCycle)+cycStartInds(iCycle)-1;
-%                 troughInds(iCycle) = troughInds(iCycle)+cycStartInds(iCycle)-1;
-                
-%                 plot(cycStartInds(iCycle):cycEndInds(iCycle),dataFiltered(cycStartInds(iCycle):cycEndInds(iCycle)));
-%                 hold all;
-%                 plot(peakInds(iCycle),dataFiltered(peakInds(iCycle)),'*');
-%                 hold all;
-%                 currPhi = phiFP(cycStartInds(iCycle):cycEndInds(iCycle));
-%                 zeroInd = zci(currPhi);
-%                 zeroInd = zeroInd(currPhi(zeroInd)<1 & currPhi(zeroInd)>-1);
-%                 zeroInd = cycStartInds(iCycle)-1+zeroInd;
-%                 plot(zeroInd,dataFiltered(zeroInd),'*','color','g');
-%                 hold all;
-%                 plot(cycStartInds(iCycle):cycEndInds(iCycle),phiFP(cycStartInds(iCycle):cycEndInds(iCycle)));
-%                 close all;
+
             end
             
             %slow waves are the candidates in the high
@@ -488,6 +478,216 @@ classdef SlowWavesDetector < handle
             
         end
         
+        % Modified from detect_SW_positive_dealWithSAW.m    
+        function [upStateTimes, downStateTimes] = detect_SW_positive(obj, data, peakTimes)
+            
+            n_points_block_size_filtfilt = 10^6; % I just chose a block size that is small enough NOT to cause "Out Of Memory" problems
+            if n_points_block_size_filtfilt > length(data)
+                n_points_block_size_filtfilt = length(data);
+            end
+            numOfSegments = floor( length(data) / n_points_block_size_filtfilt );
+            for ii_block = 1 : numOfSegments,
+                
+                idx_block = (1:n_points_block_size_filtfilt)+(ii_block-1)*n_points_block_size_filtfilt ;
+                eegSegments_BP(ii_block,:) = data(idx_block);
+            end % The "problematic discontinuities" in data_filt_ripples - on the borders of 2 blocks - are SMALL in size
+            if length( data( idx_block(end)+1 : end ) ) > 1
+                eegSegments_BP(ii_block+1,:) = NaN(1,n_points_block_size_filtfilt);
+                lastVec = data(idx_block(end)+1 : end);
+                eegSegments_BP(ii_block+1,1:length(lastVec))  = lastVec;
+            end
+            
+            numOfSegments = size(eegSegments_BP,1);
+            
+            % So far work on one channel only call results 'waves1'
+            uvValue = -7777;
+            
+            %% Resample to 100Hz for detection
+            fs = 100;
+            ss_factor = 1; % default no submsampling is necessary
+            if (obj.samplingRate > 100)
+                ss_factor = obj.samplingRate / fs;
+            end
+            eegSegments_BP_ss = zeros(numOfSegments, size(eegSegments_BP,2)/ss_factor);
+            if (obj.samplingRate > 100)
+                for i=1:numOfSegments
+                    eegSegments_BP_ss(i, :) = resample(eegSegments_BP(i, :), fs, obj.samplingRate);
+                end
+            else
+                eegSegments_BP_ss = eegSegments_BP;
+            end
+            
+            
+            %%%%%% Brady's code from here on
+            wavesAllSegments = [];
+            cntBadsegments = 0;
+            for currentSegment = 1:numOfSegments
+                % EEG is the data vector sampled at 100Hz
+                if sum(isnan(eegSegments_BP_ss(currentSegment, :))) > 1000
+                    % if it is a consecutive piece, it won't tamper with SW detection
+                    % we don't want a scenario where there's a fixed rate of missing
+                    % timestamps
+                    % Count how scattered the missing-data are
+                    if sum(diff(find(isnan(eegSegments_BP_ss(currentSegment, :)))) ~= 1) > (0.05*n_points_block_size_filtfilt/100) % 0.05% of size
+                        disp(sprintf('SW detection - seg %d/%d - too many missing samples, abort',currentSegment,numOfSegments))
+                        cntBadsegments = cntBadsegments + 1;
+                        continue
+                    end
+                end
+                pos_index=zeros(length(eegSegments_BP_ss(currentSegment, :)),1);
+                pos_index(find(eegSegments_BP_ss(currentSegment, :)>0))=1; %index of all positive points for EEG
+                difference=diff(pos_index); poscross=find(difference==1) ; negcross=find(difference==-1); %find neg ZX and pos ZX
+                EEGder=obj.meanfilt(diff(eegSegments_BP_ss(currentSegment, :)),5); %meanfilt is a function that uses a 5 sample moving window to smooth derivative
+                pos_index=zeros(length(EEGder),1);
+                pos_index(find(EEGder>0.1))=1; %index of all positive points above minimum threshold
+                difference=diff(pos_index);
+                peaks=find(difference==-1)+1; troughs=find(difference==1)+1; %find pos ZX and neg ZX of the derivative (the peaks & troughs)
+                peaks(eegSegments_BP_ss(currentSegment, peaks)<0 | isnan(eegSegments_BP_ss(currentSegment, peaks)))=[]; % rejects peaks below zero and troughs above zero
+                troughs(eegSegments_BP_ss(currentSegment, troughs)>0 | isnan(eegSegments_BP_ss(currentSegment, troughs)))=[]; % rejects peaks below zero and troughs above zero
+                
+                if negcross(1)<poscross(1);start=1;else start=2;end %makes negcross and poscross same size to start
+                if start==2;poscross(1)=[];end
+                
+                lastpk=NaN; %way to look at Peak to Peak parameters if needed
+                
+                waves = zeros(length(negcross)-start, 28);
+                uvValueLine = ones(1, 28) * uvValue;
+                
+                for wndx=start:length(negcross)-1
+                    
+                    wavest=negcross(wndx);   %only used for neg/pos peaks
+                    wavend=negcross(wndx+1); %only used for neg/pos peaks
+                    mxdn=abs(nanmin(obj.meanfilt(diff(eegSegments_BP_ss(currentSegment, wavest:poscross(wndx))),5)))*fs;     % matrix (27) determines instantaneous positive 1st segement slope on smoothed signal, (name not representative)
+                    mxup=nanmax(obj.meanfilt(diff(eegSegments_BP_ss(currentSegment, wavest:poscross(wndx))),5))*fs;     % matrix (28) determines maximal negative slope for 2nd segement (name not representative)
+                    negpeaks=troughs(troughs>wavest&troughs<wavend);
+                    
+                    % In case a peak is not detected for this wave (happens rarely)
+                    if (size(negpeaks,1) == 0)
+                        waves(wndx, :) = uvValueLine;
+                        continue;
+                    end
+                    
+                    pospeaks=peaks(peaks>wavest&peaks<=wavend);
+                    if isempty(pospeaks);pospeaks=wavend; end %if negpeaks is empty set negpeak to pos ZX
+                    period=wavend-wavest; %matrix(11) /fs
+                    poszx=poscross(wndx); %matrix(10)
+                    b=nanmin(eegSegments_BP_ss(currentSegment, negpeaks)); % matrix (12) most pos peak /abs for matrix
+                    if b>0;b=b(1);end;
+                    bx=negpeaks(eegSegments_BP_ss(currentSegment, negpeaks)==b); %matrix (13) max pos peak location in entire night
+                    c=nanmax(eegSegments_BP_ss(currentSegment, pospeaks)); % matrix (14) most neg peak
+                    if c>0;c=c(1);end;
+                    cx=pospeaks(eegSegments_BP_ss(currentSegment, pospeaks)==c); %matrix (15) max neg peak location in entire night
+                    maxb2c=c-b; % %matrix (16) max peak to peak amp
+                    nump=length(negpeaks); %matrix(24) now number of positive peaks
+                    n1=abs(eegSegments_BP_ss(currentSegment, negpeaks(1))); %matrix(17) 1st pos peak amp
+                    n1x=negpeaks(1); %matrix(18) 1st pos peak location
+                    nEnd=abs(eegSegments_BP_ss(currentSegment, negpeaks(end))); %matrix(19) last pos peak amp
+                    nEndx=negpeaks(end);%matrix(20) last pos peak location
+                    p1=eegSegments_BP_ss(currentSegment, pospeaks(1)); %matrix(21) 1st neg peak amp
+                    p1x=pospeaks(1); %matrix(22) 1st pos peak location
+                    meanAmp=abs(mean(eegSegments_BP_ss(currentSegment, negpeaks))); %matrix(23)
+                    nperiod=poszx-wavest; %matrix (25)neghalfwave period
+                    mdpt=wavest+ceil(nperiod/2); %matrix(9)
+                    %         epoch=ceil(bx/(fs*epochsize)); %matrix(1)
+                    epoch = uvValue;
+                    %         smepoch=ceil(bx/(fs*withinsize)); %matrix(2)
+                    smepoch = uvValue;
+                    p2p=(cx-lastpk)/fs; %matrix(26) 1st peak to last peak period
+                    lastpk=cx;
+                    cycle = uvValue; qcycle = uvValue; session = uvValue;
+                    % UV: Indicate the 10sec segment # in the first column of the waves data structure
+                    waves(wndx, :) = [currentSegment smepoch uvValue cycle qcycle session wavest wavend mdpt poszx period/fs abs(b) bx c cx maxb2c n1 n1x nEnd nEndx p1 p1x meanAmp nump nperiod/fs p2p mxdn mxup];
+                    
+                end %end wndx loop
+                wavesAllSegments = [wavesAllSegments; waves];
+            end % of loop through segments
+            if cntBadsegments > 0.5*numOfSegments
+                disp('bad channel,aborting SW detection');
+                upStateTimes = NaN;
+                downStateTimes = NaN;
+                finalSlowWaves = [];
+                return
+            end
+            slowWaves = wavesAllSegments((wavesAllSegments(:, 25)<1) & (wavesAllSegments(:, 25)>0.25), :); % choose slow waves based on their period
+            
+            % IDX 29 is for staging - currently not used
+            slowWaves(:, 29) = 999; % place a random number for non-staged naps
+
+            clear finalSlowWaves; 
+            beforeMax = 500;
+            beforeMin = 1;
+            corruptedUpStates = [];     goodUpStates      = [];
+            goodRows = []; badRows = [];
+            % Use only up state times to detect waves preceded by SAW complexes
+            for currentSegment = 1:numOfSegments
+                %% First get up state times within this segment in 1000Hz so
+                %% we can compare them to the already stored SAW file:
+                idx_for_this_segment = find(slowWaves(:, 1) == currentSegment);
+                if (isempty(idx_for_this_segment))
+                    continue;
+                end
+                % get timings of slow waves in the decimated/subsampled vectors
+                upStateTimes_100Hz   = slowWaves(idx_for_this_segment, 13);
+                % get timinings of slow waves in the original EEG vector
+                subsampledTimeline = 1:ss_factor:n_points_block_size_filtfilt;
+                upStateTimesForThisSegment   = subsampledTimeline(upStateTimes_100Hz);
+                
+                rowsWithSpikeTimesForThisSegment = find(peakTimes(:) < n_points_block_size_filtfilt*currentSegment);
+                spikeTimesForThisSegment = peakTimes(rowsWithSpikeTimesForThisSegment) - n_points_block_size_filtfilt*(currentSegment - 1);
+                
+                %% Separating up states into good and bad
+                positionOfBadUpStatesInRowForThisSegment  = [];
+                positionOfGoodUpStatesInRowForThisSegment  = [];
+                for currentUpState = 1:length(upStateTimesForThisSegment)
+                    currentUpTimeWithinSegment = upStateTimesForThisSegment(currentUpState);
+                    adjacentSpikes = find( (spikeTimesForThisSegment > (currentUpTimeWithinSegment-beforeMax)) & (spikeTimesForThisSegment < (currentUpTimeWithinSegment-beforeMin)) );
+                    if (~isempty(adjacentSpikes))
+                        positionOfBadUpStatesInRowForThisSegment = [positionOfBadUpStatesInRowForThisSegment; currentUpState];
+                    else
+                        positionOfGoodUpStatesInRowForThisSegment = [positionOfGoodUpStatesInRowForThisSegment; currentUpState];
+                    end
+                end
+                goodRows = [goodRows; idx_for_this_segment(positionOfGoodUpStatesInRowForThisSegment) ];
+                badRows  = [badRows;  idx_for_this_segment(positionOfBadUpStatesInRowForThisSegment) ];
+            end
+            slowWavesClean      = slowWaves(goodRows, :);
+            slowWavesCorrupted  = slowWaves(badRows, :);
+            
+            %% Now work separately on good or bad waves -
+            %% First - GOOD WAVES
+            %% select a subset of slow waves with highest amplitudes
+            numOfSlowWaves = size(slowWavesClean,1);
+            allAmplitudes = slowWavesClean(:, 12);
+            [sortedAmplitudes,sortedIndices] = sort(allAmplitudes, 'descend');
+            slowWavesSortedByAmplitude = slowWavesClean(sortedIndices, :);
+            cutoffNumber = round((obj.desiredPercentOfSlowWaves/100) * numOfSlowWaves);
+            finalSlowWaves = slowWavesSortedByAmplitude(1:cutoffNumber, :);
+            
+            %% Define downStateTimes and upStateTimes - each is a two-column matrix
+            %% where first column is the segment and second is time in ms within that
+            %% segment in original (1000Hz) sampling frequency
+            downStateTimes = zeros(size(finalSlowWaves,1), 2);
+            upStateTimes   = zeros(size(finalSlowWaves,1), 2);
+            for currentSegment = 1:numOfSegments
+                idx_for_this_segment = find(finalSlowWaves(:, 1) == currentSegment);
+                % get timings of slow waves in the decimated/subsampled vectors
+                downStateTimes_100Hz = finalSlowWaves(idx_for_this_segment, 15);
+                upStateTimes_100Hz   = finalSlowWaves(idx_for_this_segment, 13);
+                
+                % get timinings of slow waves in the original EEG vector
+                subsampledTimeline = 1:ss_factor:n_points_block_size_filtfilt;
+                
+                downStateTimes(idx_for_this_segment, 1) = currentSegment;
+                downStateTimes(idx_for_this_segment, 2) = subsampledTimeline(downStateTimes_100Hz);
+                
+                upStateTimes(idx_for_this_segment, 1) = currentSegment;
+                upStateTimes(idx_for_this_segment, 2) = subsampledTimeline(upStateTimes_100Hz);
+                
+            end
+            
+            
+        end % func
+        
         
         function BP = bandpass(obj, timecourse, lowLimit, highLimit, filterOrder)
             
@@ -508,6 +708,22 @@ classdef SlowWavesDetector < handle
             [b, a] = butter(filterOrder, [(lowLimit/obj.samplingRate)*2 (highLimit/obj.samplingRate)*2]);
             BP = filtfilt(b, a, timecourse );
             BP(indices) = NaN;
+        end
+        
+        % same local meanfilt as used in SW-detector
+        function [filtdata] = meanfilt(obj, datatofilt,pts)
+            
+            if length(datatofilt)>=pts
+                filtdata=[];
+                ptsaway=floor(pts/2); isEven = (ptsaway*2 == pts);
+                filtdata([1:pts])=datatofilt([1:pts]);
+                filtdata([length(datatofilt)-(pts-1):length(datatofilt)])=datatofilt([length(datatofilt)-(pts-1):length(datatofilt)]);
+                for wndw=pts-ptsaway:length(datatofilt)-(pts-ptsaway)
+                    filtdata(wndw)=nanmean(datatofilt([wndw-(ptsaway)+ isEven:wndw+(ptsaway)] ));
+                end
+            else filtdata=datatofilt;
+            end
+            
         end
         
 

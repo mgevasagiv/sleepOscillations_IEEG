@@ -42,9 +42,7 @@ classdef SpindleDetector < handle
         eventMinDurationStar = 0.5; %sec
         eventMaxDurationStar = 3; % sec
         RMSWindowDuration = 200; %ms
-%         rejectionRangeMin = 20; %this is not part of Staresina's method
-%         rejectionRangeMax = 30;
-        
+
         %IIS removal constants
         windowAroundIIS = 500; %ms
         
@@ -160,14 +158,14 @@ classdef SpindleDetector < handle
                 end
                 psdx = obj.getPS(currSegment);
                 psdx = psdx(fitRangeInds);
-                 
-%                 try
-                    f = fit(freq',psdx','power2',fitOpts);
-%                 catch
-%                     a=1;
-%                 end
+                psdx(isnan(psdx)) = 0; % zero out if we have a small percentage of NaN values
+                %                 try
+                f = fit(freq',psdx','power2',fitOpts);
+                %                 catch
+                %                     a=1;
+                %                 end
                 y = feval(f,freq);
-%                 bs(end+1) = f.b;
+                %                 bs(end+1) = f.b;
                 
                 powerSpectrums = [powerSpectrums;psdx];
                 fitSpectrums = [fitSpectrums; y'];
@@ -333,8 +331,8 @@ classdef SpindleDetector < handle
                 currEndTime = spindleEventsMaxLimit(differentEvents(iSpindle+1));
 %                 spindleTimes(iSpindle) = mean(currStartTime, currEndTime);
                 
-                currentSpindle = bandpassSignal(currStartTime:currEndTime);
-                [maxSpindle,maxIndSpindle] = max(currentSpindle);
+                currentSpindle = bandpassSignal(currStartTime:currEndTime) - mean(bandpassSignal(currStartTime:currEndTime));
+                [maxSpindle,maxIndSpindle] = max(currentSpindle); 
                 spindleTimes(iSpindle) = currStartTime+maxIndSpindle;
                 startEndTimes(iSpindle,1) = currStartTime;
                 startEndTimes(iSpindle,2) = currEndTime;
