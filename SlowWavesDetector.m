@@ -174,9 +174,9 @@ classdef SlowWavesDetector < handle
             %maximal amplitude and duration, as described in Staresina et
             %al 2015
             %Input - 
-            %data - in which we want to detect slow waves
-            %Output -
-            %slowWavesTimes - slow waves times corresponding to peak time
+            % data - in which we want to detect slow waves
+            % Output -
+            % slowWavesTimes - slow waves times corresponding to peak time
             % Slow wave candidates are between zero crossings of the
             % filtered data, only candidates with the highest 25% amplitude
             % (peak-trough) and within duration limits are kept
@@ -269,20 +269,7 @@ classdef SlowWavesDetector < handle
                 ampCycles(iCycle) = peakVal-troughVal;
                 
                 peakInds(iCycle) = peakInds(iCycle)+cycStartInds(iCycle)-1;
-%                 troughInds(iCycle) = troughInds(iCycle)+cycStartInds(iCycle)-1;
-                
-%                 plot(cycStartInds(iCycle):cycEndInds(iCycle),dataFiltered(cycStartInds(iCycle):cycEndInds(iCycle)));
-%                 hold all;
-%                 plot(peakInds(iCycle),dataFiltered(peakInds(iCycle)),'*');
-%                 hold all;
-%                 currPhi = phiFP(cycStartInds(iCycle):cycEndInds(iCycle));
-%                 zeroInd = zci(currPhi);
-%                 zeroInd = zeroInd(currPhi(zeroInd)<1 & currPhi(zeroInd)>-1);
-%                 zeroInd = cycStartInds(iCycle)-1+zeroInd;
-%                 plot(zeroInd,dataFiltered(zeroInd),'*','color','g');
-%                 hold all;
-%                 plot(cycStartInds(iCycle):cycEndInds(iCycle),phiFP(cycStartInds(iCycle):cycEndInds(iCycle)));
-%                 close all;
+
             end
             
             %slow waves are the candidates in the high
