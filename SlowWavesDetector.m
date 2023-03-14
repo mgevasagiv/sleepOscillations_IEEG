@@ -235,6 +235,9 @@ classdef SlowWavesDetector < handle
             zci = @(v) find(v(:).*circshift(v(:), [-1 0]) <= 0);
             zeroCross = zci(dataFiltered);
             
+            % can't have a zero-crossing in the first sample
+            zeroCross(zeroCross == 1) = [];
+            
             %candidates can be from a positive to negative change until
             %negative to positive to change or the other way around
             if obj.isPosToNeg
@@ -529,6 +532,11 @@ classdef SlowWavesDetector < handle
                     % timestamps
                     % Count how scattered the missing-data are
                     if sum(diff(find(isnan(eegSegments_BP_ss(currentSegment, :)))) ~= 1) > (0.05*n_points_block_size_filtfilt/100) % 0.05% of size
+                        disp(sprintf('SW detection - seg %d/%d - too many missing samples, abort',currentSegment,numOfSegments))
+                        cntBadsegments = cntBadsegments + 1;
+                        continue
+                    end
+                    if sum(isnan(eegSegments_BP_ss(currentSegment, :))) > 0.5*n_points_block_size_filtfilt/ss_factor
                         disp(sprintf('SW detection - seg %d/%d - too many missing samples, abort',currentSegment,numOfSegments))
                         cntBadsegments = cntBadsegments + 1;
                         continue
