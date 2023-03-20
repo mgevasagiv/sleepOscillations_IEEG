@@ -1,13 +1,25 @@
 %the struct runData holds data about patients and where the different event
 %types are stored
 
-data_p_path = 'E:\Data_p\';
+% ---- UPDATE this part -
 
+% the main path for extracted data here -
+data_p_path = 'E:\Data_p\';
+% the code assumes extracted data will be found under
+% runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO'];
+
+% subject name
 patients = {'p1'};
+% session name
 expNames = {'EXP4'};
+% sleep-scoring vector ('1' for NREM epochs to analyze)
 sleepScoreFileName = {'sleepScore_p1'};
+% channel id to analyze
 channelsPerPatient = {[22]};
 
+% macroMontageFileName contains channel ids and area names per subject
+
+% ----------------------
 
 %noisy micro channels
 noisyChannelsPerPatient = {[]};
@@ -18,25 +30,25 @@ noisyChannelsPerPatient = {[]};
 %the slow waves file for channel 1 is 'c:\slow_wave1.mat'.
 runData = [];
 nPatients = length(patients);
-for iPatient = 1:nPatients 
+for iPatient = 1:nPatients
     runData(iPatient).patientName = patients{iPatient};
     runData(iPatient).expNames = expNames{iPatient};
-
-    %The folder where the raw data is stored - you will need to change it
-    runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO'];
     
-    runData(iPatient).MicroDataFolder = [data_p_path, patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MICRO'];    
+    %The folder where the raw data is stored - you will need to change it
+    runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO'];
+    
+    runData(iPatient).MicroDataFolder = [data_p_path, patients{iPatient},'\',expNames{iPatient},'\MICRO'];
     runData(iPatient).microChannelsFolderToLoad = runData(iPatient).MicroDataFolder;
-  
+    
     
     %The folder+filename into which the spikes results is going to be stored or is
     %already stored if the spikes detection was already run (the folder should
     %exist)
-    macroSpikeFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO\'];
+    macroSpikeFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\'];
     runData(iPatient).SpikesFileNames = fullfile(macroSpikeFolder,...
-            sprintf('MacroInterictalSpikeTimesFor_%s_%s_',patients{iPatient},expNames{iPatient}));
+        sprintf('MacroInterictalSpikeTimesFor_%s_%s_',patients{iPatient},expNames{iPatient}));
     
-    SW_folder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO\SWStaresinaResults'];
+    SW_folder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\SWStaresinaResults'];
     runData(iPatient).SWStaresinaFileName = fullfile(SW_folder,'SWTimes');
     if isempty(dir(SW_folder))
         mkdir(SW_folder)
@@ -44,50 +56,39 @@ for iPatient = 1:nPatients
     
     %The folder+filename into which the staresina spindle detections
     %results is going to be stored (the folder should exist)
-    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO\spindleStaresinaResults'];
+    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\spindleStaresinaResults'];
     runData(iPatient).SpindlesStaresinaFileNames = fullfile(spindleFolder,'spindleTimes');
     if isempty(dir(spindleFolder))
         mkdir(spindleFolder)
     end
     
-    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO\spindleResults'];
+    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\spindleResults'];
     runData(iPatient).HighFreqSpindlesFileNames = fullfile(spindleFolder,'highFreqSpindleTimes');
     if isempty(dir(spindleFolder))
         mkdir(spindleFolder)
     end
-
+    
     %The folder+filename from which spindles are going to be loaded (should be the same
     %as the line above if the detections are first run and saved into SpindlesStaresinaFileNames
-    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO\spindleResults'];
+    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\spindleResults'];
     runData(iPatient).SpindlesFileNames = fullfile(spindleFolder,'spindleTimes');
     if isempty(dir(spindleFolder))
         mkdir(spindleFolder)
     end
-     
+    
     %name of the EXP data for the patient
     runData(iPatient).ExpDataFileName = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\',patients{iPatient},'_',expNames{iPatient},'_dataset.mat'];
-    
-    % Extract stimulation times
-    mm = matfile(runData(iPatient).ExpDataFileName); EXP_DATA = mm.EXP_DATA;
-    runData(iPatient).stimulation_times = EXP_DATA.stimTiming.validatedTTL_NLX;
-    clear mm EXP_DATA
     
     %name of the sleep scoring mat file for the patient
     runData(iPatient).sleepScoringFileName = [runData(iPatient).DataFolder,'\',sleepScoreFileName{iPatient},'.mat'];
     
-    %extra fields for the micro coupling analysis
-    runData(iPatient).MicroDataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MICRO\'];
-    %The folder+filename from which micro ripples are going to be loaded
-    runData(iPatient).MicroRipplesFileNames = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MICRO\rippleResults\rippleTimes'];
-    runData(iPatient).microMontageFileName = [data_p_path,'MACRO_MONTAGE','\',patients{iPatient},'\',expNames{iPatient},'\montage.mat'];
     runData(iPatient).macroMontageFileName = [data_p_path,'MACRO_MONTAGE','\',patients{iPatient},'\',expNames{iPatient},'\MacroMontage.mat'];
-    runData(iPatient).noisyChannels = noisyChannelsPerPatient{iPatient};
     
     runData(iPatient).spikeData = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\averagedRef\',patients{iPatient},'_spike_timestamps_post_processing.mat'];
-
+    
     %channels that the detections will be performed on
-    runData(iPatient).channelsToRunOn = channelsPerPatient{iPatient};   
-
+    runData(iPatient).channelsToRunOn = channelsPerPatient{iPatient};
+    
 end
 
 
@@ -116,15 +117,11 @@ sd.spindleRangeMin = 11;
 sd.plotSpindles(currData,spindlesTimes);
 outputFolder = 'E:\Data_p\ClosedLoopDataset\spindleDetResults';
 
-%% spindle related analyses
-
-%% This analysis is focused on channels specifically used for triple synchrony analysis - to generate sup fig 8 - 
-% batch option
 
 %% an example for saving ripples using the wrapper AnalyzeSleepOsc.saveDetectionResults
 as = AnalyzeSleepOsc;
 
-%setting which detections to run - 
+%setting which detections to run -
 whatToRun.runSpikes = false;
 whatToRun.runRipples = false;
 whatToRun.runRipplesBiPolar = false;
