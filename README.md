@@ -7,5 +7,7 @@ Interictal spike detections are required to run the ripple detector - see IED de
 
 Batch run version is available too - see AnalyzeSleepOsc.m under - https://github.com/mgevasagiv/rippleDetection_IEEG
 
+Example data-set is included under the example folder - 3 iEEG channels (sampled at 1kHz) and a sleep-scoring vector.
+
 
 
