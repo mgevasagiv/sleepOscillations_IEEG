@@ -3,28 +3,14 @@
 
 data_p_path = 'E:\Data_p\';
 
-patients = {'p488'};
+patients = {'p1'};
 expNames = {'EXP4'};
-sleepScoreFileName = {'sleepScore_p488_4_LPHG2'};
+sleepScoreFileName = {'sleepScore_p1'};
+channelsPerPatient = {[22]};
 
-
-biPolarCouplesPerPatient = {[78 81;1 4;23 26],... % 488
-                            }; 
-
-%the couples on which the analysis will be run (MTL - 1st index, frontal -
-%2nd index)
-channelCouplesPerPatient = {}; 
-
-channelsPerPatient = {[], [], [],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]};
-
-%probe chan is required for up vs down comparison
-probeChans = [78, 16, 1, 46, 46, 8, nan, 1, 32, 9, 1,9,9, 17,9,...
-                1,48,9,1];
 
 %noisy micro channels
-noisyChannelsPerPatient = {[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]};
-
-INCLUDE_BOTH_HEM = 1;
+noisyChannelsPerPatient = {[]};
 
 %building the run data, not that for all file names of detections the
 %methods assume the name is <provided name according to runData><channel
@@ -36,15 +22,11 @@ for iPatient = 1:nPatients
     runData(iPatient).patientName = patients{iPatient};
     runData(iPatient).expNames = expNames{iPatient};
 
-    %the probe channel is required only for the up vs down comparison (can
-    %be left empty otherwise)
-    runData(iPatient).probeChan = probeChans(iPatient);
     %The folder where the raw data is stored - you will need to change it
     runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO'];
     
     runData(iPatient).MicroDataFolder = [data_p_path, patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MICRO'];    
     runData(iPatient).microChannelsFolderToLoad = runData(iPatient).MicroDataFolder;
-    % runData(iPatient).DataFolder = runData(iPatient).MicroDataFolder;
   
     
     %The folder+filename into which the spikes results is going to be stored or is
@@ -81,22 +63,7 @@ for iPatient = 1:nPatients
     if isempty(dir(spindleFolder))
         mkdir(spindleFolder)
     end
-    
-    %The folder+filename into which the bipolar ripples detections results is going
-    %to be stored
-    rippleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MACRO\rippleBipolarResults'];
-    runData(iPatient).RipplesBipolarFileNames = fullfile(rippleFolder,'rippleTimes');
-    if isempty(dir(rippleFolder))
-        mkdir(rippleFolder)
-    end
-    
-    runData(iPatient).RipplesFileNames = runData(iPatient).RipplesBipolarFileNames;
-    
-    %list of couples for bipolar ripple detection - where each row has the channel
-    %in which the detection is performed in the first index, and the
-    %reference channel in the second
-    runData(iPatient).biPolarCouples = biPolarCouplesPerPatient{iPatient};
-   
+     
     %name of the EXP data for the patient
     runData(iPatient).ExpDataFileName = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\',patients{iPatient},'_',expNames{iPatient},'_dataset.mat'];
     
@@ -107,8 +74,6 @@ for iPatient = 1:nPatients
     
     %name of the sleep scoring mat file for the patient
     runData(iPatient).sleepScoringFileName = [runData(iPatient).DataFolder,'\',sleepScoreFileName{iPatient},'.mat'];
-    %couples for the coupling analysis
-    runData(iPatient).channelCouples = channelCouplesPerPatient{iPatient};
     
     %extra fields for the micro coupling analysis
     runData(iPatient).MicroDataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\Denoised_Downsampled_InMicroVolt\MICRO\'];
@@ -121,30 +86,7 @@ for iPatient = 1:nPatients
     runData(iPatient).spikeData = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\averagedRef\',patients{iPatient},'_spike_timestamps_post_processing.mat'];
 
     %channels that the detections will be performed on
-    runData(iPatient).channelsToRunOn = unique(channelCouplesPerPatient{iPatient}(:,2)');   
-    
-    % Leave cortical/MTL channels only for the same hemisphere
-    if sum(strcmp(runData(iPatient).patientName,{'p485','p490'}))
-        continue
-    end
-    
-    mm = matfile(runData(iPatient).macroMontageFileName);
-    MacroMontage = mm.MacroMontage;
-    probe_str = MacroMontage(runData(iPatient).probeChan).Area;
-    hemisphere_str = probe_str(1);
-    rmv_idx = []; 
-    for ss = 1:size(runData(iPatient).channelCouples,1)
-        area_str = MacroMontage(runData(iPatient).channelCouples(ss,1)).Area;
-        if ~strcmp(area_str(1),hemisphere_str)
-            rmv_idx = [rmv_idx ss];
-        end
-    end
-    
-    if ~INCLUDE_BOTH_HEM
-        runData(iPatient).channelCouples(rmv_idx,:) = [];
-    else
-        runData(iPatient).otherHemCouples = rmv_idx;
-    end
+    runData(iPatient).channelsToRunOn = channelsPerPatient{iPatient};   
 
 end
 
@@ -177,45 +119,35 @@ outputFolder = 'E:\Data_p\ClosedLoopDataset\spindleDetResults';
 %% spindle related analyses
 
 %% This analysis is focused on channels specifically used for triple synchrony analysis - to generate sup fig 8 - 
+% batch option
 
-% Gen spindle data summary per patient\channel - separately for full range
-% of spindle detection and high-freq detection
-clear whatToRun;
-whatToRun.HighFreqSpindles = 1;
-HighFreqSpindlesFolder = 'E:\Data_p\ClosedLoopDataset\spindleDetResults\MACRO_fastSpindles\';
-figureFolder = 'E:\Data_p\ClosedLoopDataset\spindleDetResults\spindlesFiguresFastSpindles';
+%% an example for saving ripples using the wrapper AnalyzeSleepOsc.saveDetectionResults
+as = AnalyzeSleepOsc;
+
+%setting which detections to run - 
+whatToRun.runSpikes = false;
+whatToRun.runRipples = false;
+whatToRun.runRipplesBiPolar = false;
+whatToRun.runSpindles = true;
+whatToRun.runSpindlesStaresina = false;
+whatToRun.runSWStaresina = false;
+whatToRun.runSWMaingret = false;
+whatToRun.HighFreqSpindles = true;
+
+%saving detections (in this example, bipolar ripples detection)
 parfor ii = 1:length(runData)
-
-    resultsFile = fullfile(HighFreqSpindlesFolder,...
-        sprintf('resultsSpindlesMACRO_%s_%s.mat',runData(ii).patientName,expNames{ii} ));
-    runData(ii).channelsToRunOn = unique(channelCouplesPerPatient{ii}(:,2)');   
-    if isempty(dir(resultsFile))
-        resultsData = sd.runSpindleData(runData(ii),resultsFile,whatToRun);
-    end
-    
+    as.saveDetectionResults(runData(ii), whatToRun);
 end
-for ii = 1:length(runData)
-    resultsFile = fullfile(HighFreqSpindlesFolder,...
-        sprintf('resultsSpindlesMACRO_%s_%s.mat',runData(ii).patientName,expNames{ii} ));
-    
-    disp(['plotting results ',runData(ii).patientName])
-    mm = matfile(resultsFile);
-    resultsData = mm.results;
-    
-    sd.plotResultsSpindlesData(resultsData,figureFolder);
-    
-end
-
 
 %%
 sd = SpindleDetector;
 
 figSuffix = 'highFreqRange';
 filename = fullfile(HighFreqSpindlesFolder,'spindleInfo_highFreq');
-outputFigureFolder = 'E:\Dropbox\Nir_Lab\closedLoopRevision\Figures\links_sup_fig10';
+outputFigureFolder = 'E:\Figures\';
 sd.plotPopulationFig(runData, filename, figSuffix, outputFigureFolder)
 
-outputFigureFolder = 'E:\Dropbox\Nir_Lab\closedLoopRevision\Figures\links_fig2';
+outputFigureFolder = 'E:\Figures\';
 figSuffix = 'fullFreqRange_allCh';
 filename = fullfile(fullFreqRangeSpindles_allChannelsFolder,'spindleInfo_fullFreq_allChanels');
 aspectRatio = true;
