@@ -2,6 +2,7 @@
 %types are stored
 
 % ---- UPDATE this part -
+data_p_path = '/Users/emily/Downloads/testing4Maya/sleepOscillations_IEEG/example';
 
 % the main path for extracted data here -
 data_p_path = 'E:\Data_p\';
@@ -11,11 +12,11 @@ data_p_path = 'E:\Data_p\';
 % subject name
 patients = {'p1'};
 % session name
-expNames = {'EXP4'};
+expNames = {'EXP1'};
 % sleep-scoring vector ('1' for NREM epochs to analyze)
 sleepScoreFileName = {'sleepScore_p1'};
 % channel id to analyze
-channelsPerPatient = {[22]};
+channelsPerPatient = {22};
 
 % macroMontageFileName contains channel ids and area names per subject
 
@@ -30,65 +31,70 @@ noisyChannelsPerPatient = {[]};
 %the slow waves file for channel 1 is 'c:\slow_wave1.mat'.
 runData = [];
 nPatients = length(patients);
-for iPatient = 1:nPatients
+for iPatient = nPatients :-1:1
     runData(iPatient).patientName = patients{iPatient};
     runData(iPatient).expNames = expNames{iPatient};
-    
+
     %The folder where the raw data is stored - you will need to change it
-    runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO'];
-    
-    runData(iPatient).MicroDataFolder = [data_p_path, patients{iPatient},'\',expNames{iPatient},'\MICRO'];
-    runData(iPatient).microChannelsFolderToLoad = runData(iPatient).MicroDataFolder;
-    
+    runData(iPatient).DataFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO');
+   
+  
     
     %The folder+filename into which the spikes results is going to be stored or is
     %already stored if the spikes detection was already run (the folder should
     %exist)
-    macroSpikeFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\'];
+    macroSpikeFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO');
+    if ~exist(macroSpikeFolder,'dir'),mkdir(macroSpikeFolder);end
     runData(iPatient).SpikesFileNames = fullfile(macroSpikeFolder,...
-        sprintf('MacroInterictalSpikeTimesFor_%s_%s_',patients{iPatient},expNames{iPatient}));
+            sprintf('MacroInterictalSpikeTimesFor_%s_%s_',patients{iPatient},expNames{iPatient}));
     
-    SW_folder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\SWStaresinaResults'];
+    SW_folder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO','SWStaresinaResults');
     runData(iPatient).SWStaresinaFileName = fullfile(SW_folder,'SWTimes');
-    if isempty(dir(SW_folder))
+    if ~exist(SW_folder,'dir')
         mkdir(SW_folder)
     end
     
     %The folder+filename into which the staresina spindle detections
     %results is going to be stored (the folder should exist)
-    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\spindleStaresinaResults'];
+    spindleFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO','spindleStaresinaResults');
     runData(iPatient).SpindlesStaresinaFileNames = fullfile(spindleFolder,'spindleTimes');
-    if isempty(dir(spindleFolder))
+    if ~exist(spindleFolder,'dir')
         mkdir(spindleFolder)
     end
     
-    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\spindleResults'];
+    spindleFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO','spindleResults');
     runData(iPatient).HighFreqSpindlesFileNames = fullfile(spindleFolder,'highFreqSpindleTimes');
     if isempty(dir(spindleFolder))
         mkdir(spindleFolder)
     end
-    
+
     %The folder+filename from which spindles are going to be loaded (should be the same
     %as the line above if the detections are first run and saved into SpindlesStaresinaFileNames
-    spindleFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO\spindleResults'];
+    spindleFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO','spindleResults');
     runData(iPatient).SpindlesFileNames = fullfile(spindleFolder,'spindleTimes');
-    if isempty(dir(spindleFolder))
+    if ~exist(spindleFolder,'dir')
         mkdir(spindleFolder)
     end
-    
+     
     %name of the EXP data for the patient
-    runData(iPatient).ExpDataFileName = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\',patients{iPatient},'_',expNames{iPatient},'_dataset.mat'];
-    
+    runData(iPatient).ExpDataFileName = fullfile(data_p_path,patients{iPatient},expNames{iPatient},[patients{iPatient},'_',expNames{iPatient},'_dataset.mat']);
+
+    %%%%%%% EM:  Commented out at your request
+%     % Extract stimulation times
+%     mm = matfile(runData(iPatient).ExpDataFileName); EXP_DATA = mm.EXP_DATA;
+%     runData(iPatient).stimulation_times = EXP_DATA.stimTiming.validatedTTL_NLX;
+%     clear mm EXP_DATA
+%     
     %name of the sleep scoring mat file for the patient
-    runData(iPatient).sleepScoringFileName = [runData(iPatient).DataFolder,'\',sleepScoreFileName{iPatient},'.mat'];
+    runData(iPatient).sleepScoringFileName = fullfile(runData(iPatient).DataFolder,[sleepScoreFileName{iPatient},'.mat']);
     
-    runData(iPatient).macroMontageFileName = [data_p_path,'MACRO_MONTAGE','\',patients{iPatient},'\',expNames{iPatient},'\MacroMontage.mat'];
-    
-    runData(iPatient).spikeData = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\averagedRef\',patients{iPatient},'_spike_timestamps_post_processing.mat'];
-    
+    %extra fields for the micro coupling analysis
+    runData(iPatient).macroMontageFileName = fullfile(data_p_path,'MACRO_MONTAGE',patients{iPatient},expNames{iPatient},'MacroMontage.mat');
+
+
     %channels that the detections will be performed on
-    runData(iPatient).channelsToRunOn = channelsPerPatient{iPatient};
-    
+    runData(iPatient).channelsToRunOn = channelsPerPatient{iPatient};   
+
 end
 
 
@@ -104,24 +110,32 @@ currChan = runData(iPatient).channelsToRunOn(1);
 %loading - sleep scoring, IIS, data
 sleepScoring = load(runData(1).sleepScoringFileName);
 sleepScoring = sleepScoring.sleep_score_vec;
-peakTimes = load([runData(iPatient).SpikesFileNames,num2str(currChan),'.mat']);
-peakTimes = peakTimes.peakTimes;
-currData = load([runData(iPatient).DataFolder,'\CSC',num2str(currChan),'.mat']);
+% % load or perform Interictal Spikes Detection - see https://github.com/mgevasagiv/epilepticActivity_IEEG
+% peakTimes = load([runData(iPatient).SpikesFileNames,num2str(currChan),'.mat']);
+% peakTimes = peakTimes.peakTimes;
+peakTimes = [];
+
+currData = load(fullfile(runData(iPatient).DataFolder,['CSC',num2str(currChan),'.mat']));
 currData = currData.data;
-%detecting the spindles
+% detecting the spindles
 returnStats = 1;
 sd.spindleRangeMin = 11;
 [spindlesTimes,spindleStats,spindlesStartEndTimes] = sd.detectSpindles(currData, sleepScoring, peakTimes, returnStats);
 
-%plotting the single spindles and saving the figures
+% plotting the single spindles and saving the figures
 sd.plotSpindles(currData,spindlesTimes);
-outputFolder = 'E:\Data_p\ClosedLoopDataset\spindleDetResults';
+outputFolder = fullfile(data_p_path,'output','figures');
 
+%% spindle related analyses
 
-%% an example for saving ripples using the wrapper AnalyzeSleepOsc.saveDetectionResults
+%% This analysis is focused on channels specifically used for triple synchrony analysis - to generate sup fig 8 - 
+% batch option
+
+%% an example for saving ripples using the wrapper AnalyzeSleepOsc.saveDetectionResults 
+% Can be downloaded from https://github.com/mgevasagiv/rippleDetection_IEEG
 as = AnalyzeSleepOsc;
 
-%setting which detections to run -
+%setting which detections to run - 
 whatToRun.runSpikes = false;
 whatToRun.runRipples = false;
 whatToRun.runRipplesBiPolar = false;
