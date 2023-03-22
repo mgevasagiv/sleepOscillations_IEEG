@@ -2,12 +2,12 @@
 %types are stored
 
 % ---- UPDATE this part -
-data_p_path = '/Users/emily/Downloads/testing4Maya/sleepOscillations_IEEG/example';
 
 % the main path for extracted data here -
-data_p_path = 'E:\Data_p\';
+data_p_path = 'C:\Users\mgeva\Documents\GitHub\sleepOscillations_IEEG\example\';
 % the code assumes extracted data will be found under
 % runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO'];
+outputFigureFolder = 'E:\Figures\';
 
 % subject name
 patients = {'p1'};
@@ -22,9 +22,6 @@ channelsPerPatient = {22};
 
 % ----------------------
 
-%noisy micro channels
-noisyChannelsPerPatient = {[]};
-
 %building the run data, not that for all file names of detections the
 %methods assume the name is <provided name according to runData><channel
 %num>, e.g. if runData(iPatient).SWStaresinaFileName='c:\slow_wave', then
@@ -37,7 +34,9 @@ for iPatient = nPatients :-1:1
 
     %The folder where the raw data is stored - you will need to change it
     runData(iPatient).DataFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO');
-   
+    
+    runData(iPatient).MicroDataFolder = fullfile(data_p_path, patients{iPatient},expNames{iPatient},'MICRO');    
+    runData(iPatient).microChannelsFolderToLoad = runData(iPatient).MicroDataFolder;
   
     
     %The folder+filename into which the spikes results is going to be stored or is
@@ -79,18 +78,12 @@ for iPatient = nPatients :-1:1
     %name of the EXP data for the patient
     runData(iPatient).ExpDataFileName = fullfile(data_p_path,patients{iPatient},expNames{iPatient},[patients{iPatient},'_',expNames{iPatient},'_dataset.mat']);
 
-    %%%%%%% EM:  Commented out at your request
-%     % Extract stimulation times
-%     mm = matfile(runData(iPatient).ExpDataFileName); EXP_DATA = mm.EXP_DATA;
-%     runData(iPatient).stimulation_times = EXP_DATA.stimTiming.validatedTTL_NLX;
-%     clear mm EXP_DATA
-%     
     %name of the sleep scoring mat file for the patient
     runData(iPatient).sleepScoringFileName = fullfile(runData(iPatient).DataFolder,[sleepScoreFileName{iPatient},'.mat']);
     
-    %extra fields for the micro coupling analysis
     runData(iPatient).macroMontageFileName = fullfile(data_p_path,'MACRO_MONTAGE',patients{iPatient},expNames{iPatient},'MacroMontage.mat');
-
+    
+    runData(iPatient).spikeData = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'averagedRef',patients{iPatient},'_spike_timestamps_post_processing.mat');
 
     %channels that the detections will be performed on
     runData(iPatient).channelsToRunOn = channelsPerPatient{iPatient};   
@@ -98,8 +91,8 @@ for iPatient = nPatients :-1:1
 end
 
 
-%% an example for detecting spindles directly using SpindleDetector (it's the same thing the wrapper does inside)
-sd = SpindleDetector;
+%% an example for detecting spindles directly using SpindleDetectorClass (it's the same thing the wrapper below does in batch)
+sd = SpindleDetectorClass;
 
 %an example of using the ripple detection directly and not with the wrapper
 %(on the first channel of the first patient for this example)
@@ -110,28 +103,28 @@ currChan = runData(iPatient).channelsToRunOn(1);
 %loading - sleep scoring, IIS, data
 sleepScoring = load(runData(1).sleepScoringFileName);
 sleepScoring = sleepScoring.sleep_score_vec;
-% % load or perform Interictal Spikes Detection - see https://github.com/mgevasagiv/epilepticActivity_IEEG
+
+% % load or perform interictal Spikes Detection
 % peakTimes = load([runData(iPatient).SpikesFileNames,num2str(currChan),'.mat']);
 % peakTimes = peakTimes.peakTimes;
 peakTimes = [];
 
 currData = load(fullfile(runData(iPatient).DataFolder,['CSC',num2str(currChan),'.mat']));
 currData = currData.data;
-% detecting the spindles
+%detecting the spindles
 returnStats = 1;
 sd.spindleRangeMin = 11;
 [spindlesTimes,spindleStats,spindlesStartEndTimes] = sd.detectSpindles(currData, sleepScoring, peakTimes, returnStats);
 
-% plotting the single spindles and saving the figures
-sd.plotSpindles(currData,spindlesTimes);
-outputFolder = fullfile(data_p_path,'output','figures');
+%plotting the single spindles and saving the figures
+outputFolder = fullfile(data_p_path,'output','figures'); mkdir(outputFolder);
+sd.plotSpindlesSimple(currData, spindlesTimes, outputFolder)
 
-%% spindle related analyses
+% scroll through spindles and their spectrograms using any key
+blockSize = 4;
+sd.plotSpindles(currData,spindlesTimes,blockSize);
 
-%% This analysis is focused on channels specifically used for triple synchrony analysis - to generate sup fig 8 - 
-% batch option
-
-%% an example for saving ripples using the wrapper AnalyzeSleepOsc.saveDetectionResults 
+%% an example for saving ripples using the wrapper AnalyzeSleepOsc.saveDetectionResults
 % Can be downloaded from https://github.com/mgevasagiv/rippleDetection_IEEG
 as = AnalyzeSleepOsc;
 
@@ -149,19 +142,4 @@ whatToRun.HighFreqSpindles = true;
 parfor ii = 1:length(runData)
     as.saveDetectionResults(runData(ii), whatToRun);
 end
-
-%%
-sd = SpindleDetector;
-
-figSuffix = 'highFreqRange';
-filename = fullfile(HighFreqSpindlesFolder,'spindleInfo_highFreq');
-outputFigureFolder = 'E:\Figures\';
-sd.plotPopulationFig(runData, filename, figSuffix, outputFigureFolder)
-
-outputFigureFolder = 'E:\Figures\';
-figSuffix = 'fullFreqRange_allCh';
-filename = fullfile(fullFreqRangeSpindles_allChannelsFolder,'spindleInfo_fullFreq_allChanels');
-aspectRatio = true;
-sd.plotPopulationFig(runData, filename, figSuffix, outputFigureFolder, aspectRatio)
-
 
