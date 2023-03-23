@@ -4,10 +4,10 @@
 % ---- UPDATE this part -
 
 % the main path for extracted data here -
-data_p_path = 'C:\Users\mgeva\Documents\GitHub\sleepOscillations_IEEG\example\';
+data_p_path = '/Users/emily/Downloads/testing4Maya/sleepOscillations_IEEG/example/';
 % the code assumes extracted data will be found under
 % runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO'];
-outputFigureFolder = 'E:\Figures\';
+outputFigureFolder = '/Users/emily/Downloads/testing4Maya/sleepOscillations_IEEG/Figures';
 
 % subject name
 patients = {'p1'};
@@ -117,7 +117,8 @@ sd.spindleRangeMin = 11;
 [spindlesTimes,spindleStats,spindlesStartEndTimes] = sd.detectSpindles(currData, sleepScoring, peakTimes, returnStats);
 
 %plotting the single spindles and saving the figures
-outputFolder = fullfile(data_p_path,'output','figures'); mkdir(outputFolder);
+outputFolder = fullfile(data_p_path,'output','figures'); 
+if ~exist(outputFolder,'dir'),mkdir(outputFolder);end
 sd.plotSpindlesSimple(currData, spindlesTimes, outputFolder)
 
 % scroll through spindles and their spectrograms using any key
