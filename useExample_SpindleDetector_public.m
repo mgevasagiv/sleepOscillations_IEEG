@@ -104,10 +104,13 @@ currChan = runData(iPatient).channelsToRunOn(1);
 sleepScoring = load(runData(1).sleepScoringFileName);
 sleepScoring = sleepScoring.sleep_score_vec;
 
-% % load or perform interictal Spikes Detection
-% peakTimes = load([runData(iPatient).SpikesFileNames,num2str(currChan),'.mat']);
-% peakTimes = peakTimes.peakTimes;
-peakTimes = [];
+%% load or perform interictal Spikes Detection
+try
+    peakTimes = load([runData(iPatient).SpikesFileNames,num2str(currChan),'.mat']);
+    peakTimes = peakTimes.peakTimes;
+catch
+    peakTimes = [];
+end
 
 currData = load(fullfile(runData(iPatient).DataFolder,['CSC',num2str(currChan),'.mat']));
 currData = currData.data;
