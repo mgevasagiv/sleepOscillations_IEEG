@@ -4,10 +4,15 @@
 % ---- UPDATE this part -
 
 % the main path for extracted data here -
-data_p_path = 'C:\Users\mgeva\Documents\GitHub\sleepOscillations_IEEG\example\';
+% for the given example, it's in the same folder as this code:
+data_p_path = fullfile(fileparts(which('useExample_SpindleDetector_public')),'example');
+
 % the code assumes extracted data will be found under
-% runData(iPatient).DataFolder = [data_p_path,patients{iPatient},'\',expNames{iPatient},'\MACRO'];
-outputFigureFolder = 'E:\Figures\';
+% runData(iPatient).DataFolder = fullfile(data_p_path,patients{iPatient},expNames{iPatient},'MACRO');
+
+% We will save figures in the same example folder:
+outputFolder = fullfile(data_p_path,'output','figures'); 
+if ~exist(outputFolder,'dir'),mkdir(outputFolder);end
 
 % subject name
 patients = {'p1'};
@@ -120,7 +125,6 @@ sd.spindleRangeMin = 11;
 [spindlesTimes,spindleStats,spindlesStartEndTimes] = sd.detectSpindles(currData, sleepScoring, peakTimes, returnStats);
 
 %plotting the single spindles and saving the figures
-outputFolder = fullfile(data_p_path,'output','figures'); mkdir(outputFolder);
 sd.plotSpindlesSimple(currData, spindlesTimes, outputFolder)
 
 % scroll through spindles and their spectrograms using any key

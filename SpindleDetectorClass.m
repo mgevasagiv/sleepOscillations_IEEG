@@ -531,7 +531,10 @@ classdef SpindleDetectorClass < handle
         function plotSpindles(obj, data, spindleTimes, blockSize)
             %plots the spindles and their spectrogram. 
             %blockSize sets the amount of spindles to display per figure
-            
+            hasImGaussFilt = ~isempty(which('imgaussfilt'));
+            if ~hasImGaussFilt
+                warning('The matlab function imgaussfilt (available in the image processing toolbox) is not found on your path. Spectrograms will not be smoothed.')
+            end
             if nargin < 4 || isempty(blockSize)
                 blockSize = obj.blockSizePlot;
             end
@@ -545,7 +548,7 @@ classdef SpindleDetectorClass < handle
             for iSpindle = 1:nSpindles
                 
                 %time frequncy
-                subplot(2, blockSize, indBlock);
+                ax(1) = subplot(2, blockSize, indBlock);
                 %in case it's an edge (start/end of data) and the spike can be presented int he
                 %middle of the block
                 if spindleTimes(iSpindle)>beforeAfterPoints
@@ -563,24 +566,31 @@ classdef SpindleDetectorClass < handle
                 end
                 
                 currData = data(minPoint:maxPoint);
-                plot(currData);
+                currTS = 0:1/obj.samplingRate:length(currData)/obj.samplingRate;
+                if length(currTS)>length(currData), currTS = currTS(1:length(currData));end
+                plot(currTS,currData);
                 hold all;
-                plot(spPoint,min(currData)*2,'marker','*','color','r');                
+                plot(currTS(spPoint),min(currData)*2,'marker','*','color','r');                
                 hold off;
                 title(['Spindle #',num2str(iSpindle)]);
                 
                 %spectogram
-                subplot(2, blockSize, indBlock+blockSize);
+                ax(2) = subplot(2, blockSize, indBlock+blockSize);
                 [S,F,T,P] = spectrogram(currData,obj.windowSpec,obj.noverlapSpec,obj.nfftSpec,obj.samplingRate,'yaxis','MinThreshold',obj.minThresholdSpec);
-%                 [S,F,T,P] = spectrogram(currData,obj.windowSpec,obj.noverlapSpec,obj.nfftSpec,obj.samplingRate);
                 P = P/max(max(P));
                 P1 = (10*log10(abs(P+obj.scalingFactorDeltaLog)))';
                 P1 = [P1(:,1) P1 P1(:,end)];
-                T = [0 T T(end)+1];
-                imagesc(T,F,imgaussfilt(P1',obj.sigmaImgaussfilt),[obj.minThresholdSpec,0]);
+                T = [0 T T(end)+median(diff(T))];
+                if hasImGaussFilt
+                    imagesc(T,F,imgaussfilt(P1',obj.sigmaImgaussfilt),[obj.minThresholdSpec,0]);
+                else
+                    imagesc(T,F,P1',[obj.minThresholdSpec,0]);
+                end
                 axis xy;
 %                 imagesc(T,F,P1',[obj.minThresholdSpec,0]);axis xy;
-                set(gca,'ylim',[0, obj.ylimPlot]);
+                set(ax(2),'ylim',[0, obj.ylimPlot]);
+                
+                linkaxes(ax,'x')
                 
                 indBlock = indBlock+1;
                 if indBlock > blockSize || iSpindle == nSpindles
